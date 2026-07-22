@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledger — Trade Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0D1214;
+    --surface:#151B1E;
+    --surface-2:#1B2226;
+    --surface-3:#212A2F;
+    --border:#262E33;
+    --border-soft:#1E2529;
+    --text:#E7E4DC;
+    --text-dim:#8A9299;
+    --text-faint:#565E64;
+    --accent:#D4A62A;
+    --accent-soft:#8A7020;
+    --accent-bg:rgba(212,166,42,0.10);
+    --pos:#4FA574;
+    --pos-bg:rgba(79,165,116,0.12);
+    --neg:#C7594C;
+    --neg-bg:rgba(199,89,76,0.12);
+    --neutral:#5B8DBE;
+    --neutral-bg:rgba(91,141,190,0.12);
+    --font-ui:'Inter',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+    --font-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --radius:6px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-ui);
+    font-size:14px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  ::selection{background:var(--accent-bg);color:var(--accent);}
+
+  a{color:var(--accent);}
+
+  /* ---------- Ticker strip ---------- */
+  .ticker-wrap{
+    background:var(--surface);
+    border-bottom:1px solid var(--border);
+    overflow:hidden;
+    white-space:nowrap;
+    position:relative;
+    height:34px;
+    display:flex;
+    align-items:center;
+  }
+  .ticker-wrap.empty{justify-content:center;}
+  .ticker-empty-msg{font-family:var(--font-mono);font-size:11px;color:var(--text-faint);letter-spacing:.04em;}
+  .ticker-track{
+    display:inline-flex;
+    align-items:center;
+    animation:ticker-scroll 40s linear infinite;
+    will-change:transform;
+  }
+  .ticker-wrap:hover .ticker-track{animation-play-state:paused;}
+  @keyframes ticker-scroll{
+    from{transform:translateX(0);}
+    to{transform:translateX(-50%);}
+  }
+  .ticker-item{
+    font-family:var(--font-mono);
+    font-size:12px;
+    padding:0 20px;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    border-right:1px solid var(--border-soft);
+  }
+  .ticker-sym{color:var(--text);font-weight:600;letter-spacing:.02em;}
+  .ticker-pl.pos{color:var(--pos);}
+  .ticker-pl.neg{color:var(--neg);}
+  .ticker-pl.pending{color:var(--text-faint);}
+
+  /* ---------- Layout ---------- */
+  .shell{max-width:1180px;margin:0 auto;padding:0 24px 64px;}
+
+  header.masthead{
+    padding:28px 0 20px;
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:12px;
+    border-bottom:1px solid var(--border-soft);
+    margin-bottom:24px;
+  }
+  .masthead-title{display:flex;align-items:baseline;gap:12px;}
+  .masthead-title h1{
+    font-size:22px;
+    font-weight:700;
+    margin:0;
+    letter-spacing:-0.01em;
+  }
+  .masthead-title .glyph{color:var(--accent);}
+  .masthead-title .sub{
+    font-family:var(--font-mono);
+    font-size:11px;
+    color:var(--text-faint);
+    text-transform:uppercase;
+    letter-spacing:.08em;
+  }
+  .masthead-clock{
+    font-family:var(--font-mono);
+    font-size:12px;
+    color:var(--text-dim);
+  }
+
+  /* ---------- Stat cards ---------- */
+  .stats-row{
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:1px;
+    background:var(--border-soft);
+    border:1px solid var(--border-soft);
+    border-radius:var(--radius);
+    overflow:hidden;
+    margin-bottom:28px;
+  }
+  .stat-card{
+    background:var(--surface);
+    padding:16px 18px;
+  }
+  .stat-label{
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--text-faint);
+    margin-bottom:8px;
+  }
+  .stat-value{
+    font-family:var(--font-mono);
+    font-size:20px;
+    font-weight:600;
+    letter-spacing:-0.01em;
+  }
+  .stat-value.pos{color:var(--pos);}
+  .stat-value.neg{color:var(--neg);}
+  .stat-sub{font-size:11px;color:var(--text-faint);margin-top:4px;}
+
+  @media (max-width:860px){
+    .stats-row{grid-template-columns:repeat(2,1fr);}
+  }
+
+  /* ---------- Toolbar ---------- */
+  .toolbar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:16px;
+  }
+  .toolbar .spacer{flex:1;}
+  input,select,textarea{
+    font-family:var(--font-ui);
+    background:var(--surface-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    border-radius:var(--radius);
+    padding:8px 10px;
+    font-size:13px;
+    outline:none;
+  }
+  input::placeholder{color:var(--text-faint);}
+  input:focus,select:focus,textarea:focus{
+    border-color:var(--accent-soft);
+    box-shadow:0 0 0 3px var(--accent-bg);
+  }
+  .search-input{width:180px;font-family:var(--font-mono);}
+
+  button{
+    font-family:var(--font-ui);
+    font-size:13px;
+    font-weight:600;
+    border-radius:var(--radius);
+    padding:8px 14px;
+    cursor:pointer;
+    border:1px solid var(--border);
+    background:var(--surface-2);
+    color:var(--text);
+    transition:border-color .15s ease, background .15s ease;
+  }
+  button:hover{border-color:var(--text-faint);}
+  button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:#1A1400;
+  }
+  button.primary:hover{background:#e0b232;border-color:#e0b232;}
+  button.ghost{background:transparent;}
+  button.danger-text{color:var(--neg);background:transparent;border-color:transparent;padding:4px 8px;font-size:12px;}
+  button.danger-text:hover{background:var(--neg-bg);}
+  button.icon-btn{padding:4px 8px;font-size:12px;background:transparent;border-color:transparent;color:var(--text-dim);}
+  button.icon-btn:hover{color:var(--text);background:var(--surface-3);}
+
+  /* ---------- Table ---------- */
+  .table-wrap{
+    border:1px solid var(--border-soft);
+    border-radius:var(--radius);
+    overflow:hidden;
+    background:var(--surface);
+  }
+  table{width:100%;border-collapse:collapse;}
+  thead th{
+    text-align:left;
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:var(--text-faint);
+    padding:10px 12px;
+    border-bottom:1px solid var(--border-soft);
+    background:var(--surface-2);
+    cursor:pointer;
+    user-select:none;
+    white-space:nowrap;
+  }
+  thead th:hover{color:var(--text-dim);}
+  thead th.sorted{color:var(--accent);}
+  thead th .arrow{font-size:9px;margin-left:3px;opacity:.7;}
+  tbody td{
+    padding:10px 12px;
+    border-bottom:1px solid var(--border-soft);
+    font-size:13px;
+    vertical-align:top;
+  }
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:var(--surface-2);}
+  .mono{font-family:var(--font-mono);}
+  .sym-cell{font-family:var(--font-mono);font-weight:700;letter-spacing:.02em;}
+  .num-cell{font-family:var(--font-mono);text-align:right;white-space:nowrap;}
+  .pl-pos{color:var(--pos);}
+  .pl-neg{color:var(--neg);}
+  .pl-pending{color:var(--text-faint);}
+  .tag{
+    display:inline-block;
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    padding:2px 7px;
+    border-radius:100px;
+    background:var(--surface-3);
+    color:var(--text-dim);
+    white-space:nowrap;
+  }
+  .status-dot{
+    display:inline-flex;align-items:center;gap:6px;
+    font-family:var(--font-mono);font-size:11.5px;
+  }
+  .status-dot::before{
+    content:'';width:6px;height:6px;border-radius:50%;
+    background:var(--neutral);
+  }
+  .status-dot.closed::before{background:var(--text-faint);}
+  .notes-cell{max-width:180px;color:var(--text-dim);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .row-actions{display:flex;gap:2px;white-space:nowrap;}
+
+  .empty-state{
+    padding:56px 20px;
+    text-align:center;
+    color:var(--text-faint);
+  }
+  .empty-state .big{font-family:var(--font-mono);font-size:13px;color:var(--text-dim);margin-bottom:6px;}
+  .empty-state .small{font-size:12px;}
+
+  /* ---------- Equity curve ---------- */
+  .curve-section{
+    margin-top:28px;
+    border:1px solid var(--border-soft);
+    border-radius:var(--radius);
+    background:var(--surface);
+    padding:18px 20px 14px;
+  }
+  .curve-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;}
+  .curve-head h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);margin:0;font-weight:600;}
+  .curve-head .curve-val{font-family:var(--font-mono);font-size:13px;color:var(--text-dim);}
+  svg.curve{width:100%;height:150px;display:block;}
+
+  /* ---------- Modal ---------- */
+  .overlay{
+    position:fixed;inset:0;background:rgba(5,7,8,.72);
+    display:none;align-items:flex-start;justify-content:center;
+    padding:5vh 20px;overflow-y:auto;z-index:50;
+  }
+  .overlay.show{display:flex;}
+  .modal{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:8px;
+    width:100%;max-width:640px;
+    padding:24px 26px 22px;
+    animation:modal-in .15s ease;
+  }
+  @keyframes modal-in{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+  .modal h2{font-size:16px;margin:0 0 18px;font-weight:700;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;}
+  .form-grid .full{grid-column:1/-1;}
+  .field label{
+    display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;
+    color:var(--text-faint);margin-bottom:5px;
+  }
+  .field input,.field select,.field textarea{width:100%;}
+  .field textarea{resize:vertical;min-height:52px;font-family:var(--font-ui);}
+  .modal-actions{display:flex;justify-content:space-between;align-items:center;margin-top:20px;}
+  .cf-hint{font-size:11px;color:var(--text-faint);margin-top:4px;line-height:1.4;}
+  .pl-preview{
+    font-family:var(--font-mono);font-size:13px;margin-top:2px;
+  }
+
+  footer{
+    text-align:center;color:var(--text-faint);font-size:11px;
+    margin-top:40px;font-family:var(--font-mono);
+  }
+
+  @media (max-width:640px){
+    .form-grid{grid-template-columns:1fr;}
+    .stats-row{grid-template-columns:1fr 1fr;}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .ticker-track{animation:none;}
+    .modal{animation:none;}
+  }
+</style>
+</head>
+<body>
+
+<div class="ticker-wrap" id="tickerWrap">
+  <div class="ticker-empty-msg" id="tickerEmpty">NO TRADES LOGGED YET — ADD YOUR FIRST TRADE TO START THE TAPE</div>
+  <div class="ticker-track" id="tickerTrack" style="display:none;"></div>
+</div>
+
+<div class="shell">
+
+  <header class="masthead">
+    <div class="masthead-title">
+      <h1><span class="glyph">▍</span>Ledger</h1>
+      <span class="sub">Local Trade Log</span>
+    </div>
+    <div class="masthead-clock" id="clock"></div>
+  </header>
+
+  <div class="stats-row" id="statsRow"></div>
+
+  <div class="toolbar">
+    <input type="text" class="search-input" id="searchInput" placeholder="Search symbol / notes...">
+    <select id="strategyFilter"><option value="">All strategies</option></select>
+    <select id="statusFilter">
+      <option value="">All statuses</option>
+      <option value="open">Open</option>
+      <option value="closed">Closed</option>
+    </select>
+    <div class="spacer"></div>
+    <button class="ghost" id="exportBtn">Export JSON</button>
+    <button class="ghost" id="exportCsvBtn">Export CSV</button>
+    <button class="ghost" id="importBtn">Import</button>
+    <input type="file" id="importFile" accept="application/json" style="display:none;">
+    <button class="primary" id="addTradeBtn">+ Add Trade</button>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr id="tableHead">
+          <th data-key="dateOpened">Opened</th>
+          <th data-key="symbol">Symbol</th>
+          <th data-key="type">Type</th>
+          <th data-key="strategy">Strategy</th>
+          <th data-key="legs">Legs / Notes on structure</th>
+          <th data-key="qty" style="text-align:right;">Qty</th>
+          <th data-key="entryCf" style="text-align:right;">Entry $</th>
+          <th data-key="exitCf" style="text-align:right;">Exit $</th>
+          <th data-key="pl" style="text-align:right;">P&amp;L</th>
+          <th data-key="status">Status</th>
+          <th data-key="notes">Notes</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+    <div class="empty-state" id="emptyState" style="display:none;">
+      <div class="big">// no trades match</div>
+      <div class="small">Log a trade or adjust your filters.</div>
+    </div>
+  </div>
+
+  <div class="curve-section">
+    <div class="curve-head">
+      <h2>Cumulative P&amp;L — Closed Trades</h2>
+      <span class="curve-val" id="curveVal"></span>
+    </div>
+    <svg class="curve" id="curveSvg" viewBox="0 0 1000 150" preserveAspectRatio="none"></svg>
+  </div>
+
+  <footer>All data stored locally in this browser only (localStorage). Nothing leaves this page.</footer>
+</div>
+
+<!-- Modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="modalTitle">Add Trade</h2>
+    <form id="tradeForm">
+      <input type="hidden" id="tradeId">
+      <div class="form-grid">
+        <div class="field">
+          <label for="fSymbol">Symbol</label>
+          <input type="text" id="fSymbol" placeholder="AAPL" required style="text-transform:uppercase;">
+        </div>
+        <div class="field">
+          <label for="fType">Asset Type</label>
+          <select id="fType">
+            <option value="Stock">Stock</option>
+            <option value="Option" selected>Option</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="fStrategy">Strategy</label>
+          <select id="fStrategy">
+            <option>Long Stock</option>
+            <option>Short Stock</option>
+            <option>Long Call</option>
+            <option>Long Put</option>
+            <option>Covered Call</option>
+            <option>Cash-Secured Put</option>
+            <option>Vertical Spread</option>
+            <option>Iron Condor</option>
+            <option>Iron Butterfly</option>
+            <option>Calendar Spread</option>
+            <option>Double Calendar</option>
+            <option>Straddle</option>
+            <option>Strangle</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="fQty">Quantity (contracts / shares)</label>
+          <input type="number" id="fQty" placeholder="1" step="1" required>
+        </div>
+
+        <div class="field">
+          <label for="fDateOpened">Date Opened</label>
+          <input type="date" id="fDateOpened" required>
+        </div>
+        <div class="field">
+          <label for="fDateClosed">Date Closed (blank = open)</label>
+          <input type="date" id="fDateClosed">
+        </div>
+
+        <div class="field full">
+          <label for="fLegs">Structure / Legs (strikes, expiry)</label>
+          <input type="text" id="fLegs" placeholder="e.g. Sell 350C/350P, Buy 375C/325P exp 7/24">
+        </div>
+
+        <div class="field">
+          <label for="fEntryCf">Entry Cash Flow ($)</label>
+          <input type="number" id="fEntryCf" step="0.01" placeholder="+465 credit / -2000 debit" required>
+          <div class="cf-hint">Positive = credit received. Negative = debit paid.</div>
+        </div>
+        <div class="field">
+          <label for="fExitCf">Exit Cash Flow ($)</label>
+          <input type="number" id="fExitCf" step="0.01" placeholder="leave blank if still open">
+          <div class="cf-hint">Positive = received on close. Negative = paid to close.</div>
+        </div>
+
+        <div class="field">
+          <label for="fMaxRisk">Max Risk ($, optional)</label>
+          <input type="number" id="fMaxRisk" step="0.01" placeholder="for R-multiple tracking">
+        </div>
+        <div class="field">
+          <label>Estimated P&amp;L</label>
+          <div class="pl-preview" id="plPreview">—</div>
+        </div>
+
+        <div class="field full">
+          <label for="fNotes">Notes</label>
+          <textarea id="fNotes" placeholder="Thesis, adjustment log, lessons..."></textarea>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="ghost" id="cancelBtn">Cancel</button>
+        <button type="submit" class="primary" id="saveBtn">Save Trade</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const STORE_KEY = "ledger_trades_v1";
+  let trades = [];
+  let sortKey = "dateOpened";
+  let sortDir = "desc";
+
+  // ---------- persistence ----------
+  function load(){
+    try{
+      const raw = localStorage.getItem(STORE_KEY);
+      trades = raw ? JSON.parse(raw) : [];
+    }catch(e){ trades = []; }
+  }
+  function save(){
+    localStorage.setItem(STORE_KEY, JSON.stringify(trades));
+  }
+
+  // ---------- helpers ----------
+  function uid(){ return 't_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+  function fmtMoney(n){
+    if(n === null || n === undefined || isNaN(n)) return '—';
+    const sign = n < 0 ? '-' : '+';
+    const abs = Math.abs(n);
+    return (n===0?'':sign) + '$' + abs.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
+  function fmtMoneyPlain(n){
+    if(n === null || n === undefined || isNaN(n)) return '—';
+    return '$' + n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
+  function computePl(t){
+    if(t.exitCf === null || t.exitCf === undefined || t.exitCf === '') return null;
+    return round2(Number(t.entryCf) + Number(t.exitCf));
+  }
+  function round2(n){ return Math.round(n*100)/100; }
+  function isOpen(t){ return t.exitCf === null || t.exitCf === undefined || t.exitCf === ''; }
+  function todayStr(){ return new Date().toISOString().slice(0,10); }
+
+  // ---------- clock ----------
+  function tickClock(){
+    const el = document.getElementById('clock');
+    const now = new Date();
+    el.textContent = now.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'})
+      + '  ' + now.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  // ---------- ticker strip ----------
+  function renderTicker(){
+    const wrap = document.getElementById('tickerWrap');
+    const empty = document.getElementById('tickerEmpty');
+    const track = document.getElementById('tickerTrack');
+    if(trades.length === 0){
+      empty.style.display='block'; track.style.display='none';
+      return;
+    }
+    empty.style.display='none'; track.style.display='inline-flex';
+    const sorted = [...trades].sort((a,b)=> new Date(b.dateOpened) - new Date(a.dateOpened)).slice(0,20);
+    const items = sorted.map(t=>{
+      const pl = computePl(t);
+      let cls = 'pending', txt = 'OPEN';
+      if(pl !== null){ cls = pl>=0?'pos':'neg'; txt = fmtMoney(pl); }
+      return `<span class="ticker-item"><span class="ticker-sym">${escHtml(t.symbol)}</span><span class="ticker-pl ${cls}">${txt}</span></span>`;
+    }).join('');
+    track.innerHTML = items + items; // duplicate for seamless loop
+  }
+
+  function escHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ---------- stats ----------
+  function renderStats(){
+    const closed = trades.filter(t=>!isOpen(t)).map(t=>computePl(t));
+    const open = trades.filter(isOpen);
+    const totalPl = closed.reduce((s,p)=>s+p,0);
+    const wins = closed.filter(p=>p>0);
+    const losses = closed.filter(p=>p<0);
+    const winRate = closed.length ? (wins.length/closed.length*100) : null;
+    const avgWin = wins.length ? wins.reduce((a,b)=>a+b,0)/wins.length : null;
+    const avgLoss = losses.length ? losses.reduce((a,b)=>a+b,0)/losses.length : null;
+    const profitFactor = (losses.length && avgLoss!==0) ?
+      (wins.reduce((a,b)=>a+b,0) / Math.abs(losses.reduce((a,b)=>a+b,0))) : null;
+
+    const cards = [
+      {label:'Total P&L (closed)', value: closed.length? fmtMoney(round2(totalPl)) : '—', cls: closed.length ? (totalPl>=0?'pos':'neg') : ''},
+      {label:'Win Rate', value: winRate!==null ? winRate.toFixed(0)+'%' : '—', sub: closed.length? `${wins.length}W / ${losses.length}L` : ''},
+      {label:'Avg Win / Avg Loss', value: (avgWin!==null||avgLoss!==null) ? `${avgWin!==null?fmtMoney(round2(avgWin)):'—'} / ${avgLoss!==null?fmtMoney(round2(avgLoss)):'—'}` : '—'},
+      {label:'Profit Factor', value: profitFactor!==null ? profitFactor.toFixed(2) : '—'},
+      {label:'Open Positions', value: open.length, sub: open.length ? fmtMoneyPlain(open.reduce((s,t)=>s+Number(t.entryCf||0),0)) + ' net entry CF' : ''}
+    ];
+    const row = document.getElementById('statsRow');
+    row.innerHTML = cards.map(c=>`
+      <div class="stat-card">
+        <div class="stat-label">${c.label}</div>
+        <div class="stat-value ${c.cls||''}">${c.value}</div>
+        ${c.sub?`<div class="stat-sub">${c.sub}</div>`:''}
+      </div>
+    `).join('');
+  }
+
+  // ---------- filters / strategy dropdown ----------
+  function refreshStrategyFilter(){
+    const sel = document.getElementById('strategyFilter');
+    const current = sel.value;
+    const strategies = [...new Set(trades.map(t=>t.strategy))].sort();
+    sel.innerHTML = '<option value="">All strategies</option>' +
+      strategies.map(s=>`<option value="${escHtml(s)}">${escHtml(s)}</option>`).join('');
+    sel.value = strategies.includes(current) ? current : '';
+  }
+
+  function getFiltered(){
+    const q = document.getElementById('searchInput').value.trim().toLowerCase();
+    const strat = document.getElementById('strategyFilter').value;
+    const status = document.getElementById('statusFilter').value;
+    return trades.filter(t=>{
+      if(strat && t.strategy !== strat) return false;
+      if(status === 'open' && !isOpen(t)) return false;
+      if(status === 'closed' && isOpen(t)) return false;
+      if(q){
+        const hay = (t.symbol+' '+(t.notes||'')+' '+(t.legs||'')).toLowerCase();
+        if(!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }
+
+  // ---------- table ----------
+  function renderTable(){
+    const body = document.getElementById('tableBody');
+    const empty = document.getElementById('emptyState');
+    let rows = getFiltered();
+
+    rows.sort((a,b)=>{
+      let av, bv;
+      if(sortKey === 'pl'){ av = computePl(a); bv = computePl(b); av = av===null?-Infinity:av; bv = bv===null?-Infinity:bv; }
+      else if(sortKey === 'qty' || sortKey === 'entryCf' || sortKey === 'exitCf'){ av = Number(a[sortKey])||0; bv = Number(b[sortKey])||0; }
+      else if(sortKey === 'dateOpened'){ av = new Date(a.dateOpened); bv = new Date(b.dateOpened); }
+      else { av = (a[sortKey]||'').toString().toLowerCase(); bv = (b[sortKey]||'').toString().toLowerCase(); }
+      if(av < bv) return sortDir === 'asc' ? -1 : 1;
+      if(av > bv) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    if(rows.length === 0){
+      body.innerHTML = '';
+      empty.style.display = 'block';
+    } else {
+      empty.style.display = 'none';
+      body.innerHTML = rows.map(t=>{
+        const pl = computePl(t);
+        const plCls = pl===null ? 'pl-pending' : (pl>=0?'pl-pos':'pl-neg');
+        const plTxt = pl===null ? 'open' : fmtMoney(pl);
+        const openFlag = isOpen(t);
+        return `
+        <tr>
+          <td class="mono">${t.dateOpened||''}</td>
+          <td class="sym-cell">${escHtml(t.symbol)}</td>
+          <td><span class="tag">${escHtml(t.type)}</span></td>
+          <td>${escHtml(t.strategy)}</td>
+          <td class="notes-cell" title="${escHtml(t.legs||'')}">${escHtml(t.legs||'—')}</td>
+          <td class="num-cell">${t.qty}</td>
+          <td class="num-cell">${fmtMoney(Number(t.entryCf))}</td>
+          <td class="num-cell">${t.exitCf!==null && t.exitCf!==undefined && t.exitCf!=='' ? fmtMoney(Number(t.exitCf)) : '—'}</td>
+          <td class="num-cell ${plCls}">${plTxt}</td>
+          <td><span class="status-dot ${openFlag?'':'closed'}">${openFlag?'Open':'Closed'}</span></td>
+          <td class="notes-cell" title="${escHtml(t.notes||'')}">${escHtml(t.notes||'—')}</td>
+          <td>
+            <div class="row-actions">
+              <button class="icon-btn" data-edit="${t.id}">Edit</button>
+              <button class="icon-btn danger-text" data-del="${t.id}">Del</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    document.querySelectorAll('#tableHead th[data-key]').forEach(th=>{
+      th.classList.toggle('sorted', th.dataset.key === sortKey);
+      const arrow = th.querySelector('.arrow');
+      if(arrow) arrow.remove();
+      if(th.dataset.key === sortKey){
+        th.insertAdjacentHTML('beforeend', `<span class="arrow">${sortDir==='asc'?'▲':'▼'}</span>`);
+      }
+    });
+
+    body.querySelectorAll('[data-edit]').forEach(b=> b.addEventListener('click', ()=> openModal(b.dataset.edit)));
+    body.querySelectorAll('[data-del]').forEach(b=> b.addEventListener('click', ()=> deleteTrade(b.dataset.del)));
+  }
+
+  // ---------- equity curve ----------
+  function renderCurve(){
+    const svg = document.getElementById('curveSvg');
+    const closed = trades.filter(t=>!isOpen(t))
+      .map(t=>({date:new Date(t.dateClosed||t.dateOpened), pl:computePl(t)}))
+      .sort((a,b)=> a.date - b.date);
+
+    if(closed.length === 0){
+      svg.innerHTML = `<text x="500" y="78" text-anchor="middle" fill="#565E64" font-family="JetBrains Mono" font-size="12">no closed trades yet</text>`;
+      document.getElementById('curveVal').textContent = '';
+      return;
+    }
+
+    let cum = 0;
+    const pts = closed.map(c=>{ cum += c.pl; return cum; });
+    const min = Math.min(0, ...pts);
+    const max = Math.max(0, ...pts);
+    const range = (max - min) || 1;
+    const W = 1000, H = 150, padX = 10, padY = 14;
+
+    const coords = pts.map((v,i)=>{
+      const x = pts.length===1 ? W/2 : padX + (i/(pts.length-1))*(W-2*padX);
+      const y = H - padY - ((v-min)/range)*(H-2*padY);
+      return [x,y];
+    });
+
+    const zeroY = H - padY - ((0-min)/range)*(H-2*padY);
+    const last = pts[pts.length-1];
+    const lineColor = last >= 0 ? '#4FA574' : '#C7594C';
+
+    const path = coords.map((c,i)=> (i===0?'M':'L') + c[0].toFixed(1) + ',' + c[1].toFixed(1)).join(' ');
+    const areaPath = path + ` L${coords[coords.length-1][0].toFixed(1)},${zeroY.toFixed(1)} L${coords[0][0].toFixed(1)},${zeroY.toFixed(1)} Z`;
+
+    svg.innerHTML = `
+      <line x1="0" y1="${zeroY.toFixed(1)}" x2="${W}" y2="${zeroY.toFixed(1)}" stroke="#262E33" stroke-width="1" stroke-dasharray="4 4"/>
+      <path d="${areaPath}" fill="${lineColor}" opacity="0.08"/>
+      <path d="${path}" fill="none" stroke="${lineColor}" stroke-width="2"/>
+      ${coords.map(c=>`<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="2.5" fill="${lineColor}"/>`).join('')}
+    `;
+    document.getElementById('curveVal').textContent = fmtMoney(round2(last)) + ` across ${closed.length} closed trade${closed.length===1?'':'s'}`;
+  }
+
+  // ---------- render all ----------
+  function renderAll(){
+    renderTicker();
+    renderStats();
+    refreshStrategyFilter();
+    renderTable();
+    renderCurve();
+  }
+
+  // ---------- modal / form ----------
+  const overlay = document.getElementById('overlay');
+  const form = document.getElementById('tradeForm');
+
+  function openModal(id){
+    form.reset();
+    document.getElementById('tradeId').value = '';
+    document.getElementById('modalTitle').textContent = 'Add Trade';
+    document.getElementById('fDateOpened').value = todayStr();
+    updatePlPreview();
+
+    if(id){
+      const t = trades.find(x=>x.id===id);
+      if(t){
+        document.getElementById('modalTitle').textContent = 'Edit Trade';
+        document.getElementById('tradeId').value = t.id;
+        document.getElementById('fSymbol').value = t.symbol;
+        document.getElementById('fType').value = t.type;
+        document.getElementById('fStrategy').value = t.strategy;
+        document.getElementById('fQty').value = t.qty;
+        document.getElementById('fDateOpened').value = t.dateOpened;
+        document.getElementById('fDateClosed').value = t.dateClosed || '';
+        document.getElementById('fLegs').value = t.legs || '';
+        document.getElementById('fEntryCf').value = t.entryCf;
+        document.getElementById('fExitCf').value = (t.exitCf===null||t.exitCf===undefined)?'':t.exitCf;
+        document.getElementById('fMaxRisk').value = (t.maxRisk===null||t.maxRisk===undefined)?'':t.maxRisk;
+        document.getElementById('fNotes').value = t.notes || '';
+        updatePlPreview();
+      }
+    }
+    overlay.classList.add('show');
+    document.getElementById('fSymbol').focus();
+  }
+  function closeModal(){ overlay.classList.remove('show'); }
+
+  function updatePlPreview(){
+    const entry = parseFloat(document.getElementById('fEntryCf').value);
+    const exitV = document.getElementById('fExitCf').value;
+    const preview = document.getElementById('plPreview');
+    if(isNaN(entry)){ preview.textContent = '—'; preview.className='pl-preview'; return; }
+    if(exitV === ''){ preview.textContent = 'open position'; preview.className='pl-preview'; preview.style.color='var(--text-faint)'; return; }
+    const pl = round2(entry + parseFloat(exitV));
+    preview.textContent = fmtMoney(pl);
+    preview.style.color = pl >= 0 ? 'var(--pos)' : 'var(--neg)';
+  }
+  ['fEntryCf','fExitCf'].forEach(id=> document.getElementById(id).addEventListener('input', updatePlPreview));
+
+  document.getElementById('addTradeBtn').addEventListener('click', ()=> openModal(null));
+  document.getElementById('cancelBtn').addEventListener('click', closeModal);
+  overlay.addEventListener('click', e=>{ if(e.target === overlay) closeModal(); });
+  document.addEventListener('keydown', e=>{ if(e.key === 'Escape' && overlay.classList.contains('show')) closeModal(); });
+
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    const id = document.getElementById('tradeId').value;
+    const exitRaw = document.getElementById('fExitCf').value;
+    const riskRaw = document.getElementById('fMaxRisk').value;
+    const rec = {
+      id: id || uid(),
+      symbol: document.getElementById('fSymbol').value.trim().toUpperCase(),
+      type: document.getElementById('fType').value,
+      strategy: document.getElementById('fStrategy').value,
+      qty: Number(document.getElementById('fQty').value) || 0,
+      dateOpened: document.getElementById('fDateOpened').value,
+      dateClosed: document.getElementById('fDateClosed').value || null,
+      legs: document.getElementById('fLegs').value.trim(),
+      entryCf: Number(document.getElementById('fEntryCf').value),
+      exitCf: exitRaw === '' ? null : Number(exitRaw),
+      maxRisk: riskRaw === '' ? null : Number(riskRaw),
+      notes: document.getElementById('fNotes').value.trim()
+    };
+    if(id){
+      const idx = trades.findIndex(t=>t.id===id);
+      if(idx > -1) trades[idx] = rec;
+    } else {
+      trades.push(rec);
+    }
+    save();
+    renderAll();
+    closeModal();
+  });
+
+  function deleteTrade(id){
+    if(!confirm('Delete this trade? This cannot be undone.')) return;
+    trades = trades.filter(t=>t.id!==id);
+    save();
+    renderAll();
+  }
+
+  // ---------- sorting ----------
+  document.getElementById('tableHead').addEventListener('click', e=>{
+    const th = e.target.closest('th[data-key]');
+    if(!th) return;
+    const key = th.dataset.key;
+    if(sortKey === key){ sortDir = sortDir === 'asc' ? 'desc' : 'asc'; }
+    else { sortKey = key; sortDir = 'desc'; }
+    renderTable();
+  });
+
+  // ---------- filters ----------
+  document.getElementById('searchInput').addEventListener('input', renderTable);
+  document.getElementById('strategyFilter').addEventListener('change', renderTable);
+  document.getElementById('statusFilter').addEventListener('change', renderTable);
+
+  // ---------- export / import ----------
+  document.getElementById('exportBtn').addEventListener('click', ()=>{
+    downloadBlob(JSON.stringify(trades, null, 2), 'application/json', `trade-log-${todayStr()}.json`);
+  });
+  document.getElementById('exportCsvBtn').addEventListener('click', ()=>{
+    const cols = ['id','symbol','type','strategy','qty','dateOpened','dateClosed','legs','entryCf','exitCf','maxRisk','notes'];
+    const header = cols.join(',');
+    const lines = trades.map(t=> cols.map(c=>{
+      let v = t[c];
+      if(v===null||v===undefined) v='';
+      v = String(v).replace(/"/g,'""');
+      if(v.includes(',') || v.includes('"') || v.includes('\n')) v = `"${v}"`;
+      return v;
+    }).join(','));
+    downloadBlob([header,...lines].join('\n'), 'text/csv', `trade-log-${todayStr()}.csv`);
+  });
+  function downloadBlob(content, mime, filename){
+    const blob = new Blob([content], {type:mime});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  document.getElementById('importBtn').addEventListener('click', ()=> document.getElementById('importFile').click());
+  document.getElementById('importFile').addEventListener('change', function(e){
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(){
+      try{
+        const data = JSON.parse(reader.result);
+        if(!Array.isArray(data)) throw new Error('not an array');
+        const mode = confirm('Click OK to MERGE with existing trades, or Cancel to REPLACE all existing trades.');
+        if(mode){
+          const existingIds = new Set(trades.map(t=>t.id));
+          data.forEach(t=>{ if(!existingIds.has(t.id)) trades.push(t); });
+        } else {
+          trades = data;
+        }
+        save();
+        renderAll();
+      }catch(err){
+        alert('Could not import file: ' + err.message);
+      }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  });
+
+  // ---------- init ----------
+  load();
+  renderAll();
+})();
+</script>
+</body>
+</html>
